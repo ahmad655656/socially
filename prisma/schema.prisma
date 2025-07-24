@@ -1,0 +1,121 @@
+// هذا هو ملف مخطط Prisma الخاص بك، 
+// تعرف على المزيد حوله في الوثائق: https://pris.ly/d/prisma-schema
+
+// تبحث عن طرق لتسريع استعلاماتك، أو التوسع بسهولة مع وظائفك الخدمية أو الحافة؟
+// جرب Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js" // تحديد مزود عميل Prisma
+}
+
+datasource db {
+  provider = "postgresql" // تحديد نوع قاعدة البيانات المستخدمة (PostgreSQL)
+  url      = env("DATABASE_URL") // استخدام متغير البيئة لتحديد عنوان قاعدة البيانات
+}
+
+model User {
+  id String @id @default(cuid()) // معرف المستخدم، يتم إنشاؤه تلقائيًا باستخدام cuid
+  email String @unique // البريد الإلكتروني، يجب أن يكون فريدًا
+  username String @unique // اسم المستخدم، يجب أن يكون فريدًا
+  clerkId String @unique // معرف المستخدم من Clerk، يجب أن يكون فريدًا
+  name String? // اسم المستخدم (اختياري)
+  bio String? // السيرة الذاتية (اختياري)
+  image String? // صورة المستخدم (اختياري)
+  location String? // موقع المستخدم (اختياري)
+  website String? // موقع الويب الخاص بالمستخدم (اختياري)
+  createdAt DateTime @default(now()) // تاريخ إنشاء المستخدم، يتم تعيينه تلقائيًا
+  updatedAt DateTime @updatedAt // تاريخ آخر تحديث للمستخدم، يتم تحديثه تلقائيًا
+
+  // العلاقات: 
+  posts Post[] // علاقة واحد إلى متعدد مع المنشورات
+  comments Comment[] // علاقة واحد إلى متعدد مع التعليقات
+  likes Like[] // علاقة واحد إلى متعدد مع الإعجابات
+
+  followers Follows[] @relation("following") // المستخدمون الذين يتابعون هذا المستخدم
+  following Follows[] @relation("follower") // المستخدمون الذين يتابعهم هذا المستخدم
+
+  notifications Notification[] @relation("userNotifications") // الإشعارات المستلمة من قبل المستخدم
+  notificationsCreated Notification[] @relation("notificationCreator") // الإشعارات التي أنشأها المستخدم
+}
+
+model Post {
+  id        String    @id @default(cuid()) // معرف المنشور، يتم إنشاؤه تلقائيًا باستخدام cuid
+  authorId String // معرف المؤلف (المستخدم) للمنشور
+  content String? // محتوى المنشور (اختياري)
+  image String? // صورة المنشور (اختياري)
+  createdAt DateTime  @default(now()) // تاريخ إنشاء المنشور، يتم تعيينه تلقائيًا
+  updatedAt DateTime  @updatedAt // تاريخ آخر تحديث للمنشور، يتم تحديثه تلقائيًا
+
+  // العلاقات
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade) // علاقة مع المستخدم المؤلف، مع حذف متسلسل
+  comments Comment[] // علاقة واحد إلى متعدد مع التعليقات
+  likes Like[] // علاقة واحد إلى متعدد مع الإعجابات
+  notifications Notification[] // الإشعارات المرتبطة بالمنشور
+}
+
+model Comment {
+  id String @id @default(cuid()) // معرف التعليق، يتم إنشاؤه تلقائيًا باستخدام cuid
+  content String // محتوى التعليق (مطلوب)
+  authorId String // معرف المؤلف (المستخدم) للتعليق
+  postId String // معرف المنشور الذي ينتمي إليه التعليق
+  createdAt DateTime @default(now()) // تاريخ إنشاء التعليق، يتم تعيينه تلقائيًا
+
+  // العلاقات
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade) // علاقة مع المستخدم المؤلف، مع حذف متسلسل
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade) // علاقة مع المنشور، مع حذف متسلسل
+  notifications Notification[] // الإشعارات المرتبطة بالتعليق
+
+  @@index([authorId, postId]) // فهرس مركب لتحسين سرعة الاستعلامات
+}
+
+model Like {
+  id        String   @id @default(cuid()) // معرف الإعجاب، يتم إنشاؤه تلقائيًا باستخدام cuid
+  postId    String // معرف المنشور الذي تم الإعجاب به
+  userId    String // معرف المستخدم الذي قام بالإعجاب
+  createdAt DateTime @default(now()) // تاريخ إنشاء الإعجاب، يتم تعيينه تلقائيًا
+
+  // العلاقات
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade) // علاقة مع المستخدم، مع حذف متسلسل
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade) // علاقة مع المنشور، مع حذف متسلسل
+
+  @@index([userId, postId]) // فهرس مركب لتحسين سرعة الاستعلامات
+  @@unique([userId, postId]) // يمنع نفس المستخدم من الإعجاب بنفس المنشور مرتين
+}
+
+model Follows {
+  followerId String // معرف المتابع
+  followingId String // معرف المتابع له
+  createdAt DateTime @default(now()) // تاريخ إنشاء المتابعة، يتم تعيينه تلقائيًا
+
+  // العلاقات
+  follower User @relation("follower", fields: [followerId], references: [id], onDelete: Cascade) // علاقة مع المستخدم المتابع، مع حذف متسلسل
+  following User @relation("following", fields: [followingId], references: [id], onDelete: Cascade) // علاقة مع المستخدم المتابع له، مع حذف متسلسل
+
+  @@index([followerId, followingId]) // فهرس مركب لتحسين سرعة الاستعلامات
+  @@id([followerId, followingId]) // مفتاح أساسي مركب يمنع تكرار المتابعات
+}
+
+model Notification {
+  id        String   @id @default(cuid()) // معرف الإشعار، يتم إنشاؤه تلقائيًا باستخدام cuid
+  userId    String // معرف المستخدم الذي يتلقى الإشعار
+  creatorId String // معرف المستخدم الذي أنشأ الإشعار
+  type      NotificationType // نوع الإشعار (مثل الإعجاب، التعليق، المتابعة)
+  read      Boolean  @default(false) // حالة قراءة الإشعار، افتراضيًا غير مقروء
+  postId    String? // معرف المنشور المرتبط بالإشعار (اختياري)
+  commentId String? // معرف التعليق المرتبط بالإشعار (اختياري)
+  createdAt DateTime @default(now()) // تاريخ إنشاء الإشعار، يتم تعيينه تلقائيًا
+  
+  // العلاقات
+  user User @relation("userNotifications", fields: [userId], references: [id], onDelete: Cascade) // علاقة مع المستخدم الذي يتلقى الإشعار، مع حذف متسلسل
+  creator User @relation("notificationCreator", fields: [creatorId], references: [id], onDelete: Cascade) // علاقة مع المستخدم الذي أنشأ الإشعار، مع حذف متسلسل
+  post Post? @relation(fields: [postId], references: [id], onDelete: Cascade) // علاقة مع المنشور المرتبط بالإشعار، مع حذف متسلسل
+  comment Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade) // علاقة مع التعليق المرتبط بالإشعار، مع حذف متسلسل
+
+  @@index([userId, createdAt]) // فهرس لتحسين سرعة الاستعلامات
+}
+
+enum NotificationType {
+  LIKE // نوع الإشعار للإعجاب
+  COMMENT // نوع الإشعار للتعليق
+  FOLLOW // نوع الإشعار للمتابعة
+}
